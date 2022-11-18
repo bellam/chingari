@@ -5,6 +5,8 @@ import io.bellare.OAuthRequest
 import io.bellare.OAuthSignature
 import io.bellare.OAuthHelper
 
+import java.io._
+
 @main
 def main(s: String*): Unit = {
   go(s(0), s(1))
@@ -12,7 +14,7 @@ def main(s: String*): Unit = {
 
 def go(handle: String, maxId: String): Unit = {
   Thread.sleep(2000)
-  // println(s"**** maxId $maxId ****")
+  println(s"**** maxId $maxId ****")
 
   // 1. create auth header
   val env = OAuthHelper.env
@@ -43,18 +45,24 @@ def go(handle: String, maxId: String): Unit = {
     http_url = "https://api.twitter.com/1.1/statuses/user_timeline.json",
     query_parameters = qp
   )
-  val printer: ujson.Value.Value => Unit = data =>
-    data.arr.foreach(t => {
-      print(t("id") + "\t" + t("created_at") + "\t")
-      val hts = t("entities")("hashtags").arr
-      if (hts.length > 0)
-        hts.foreach(h => print("#" + h("text") + ","))
-      else
-        print("\"no hashtag\"")
-      print("\t")
-      print(t("text"))
-      println("")
-    })
+
+  val printer: (File, ujson.Value.Value) => String = (file, data) => {
+    val bw = new BufferedWriter(new FileWriter(file, true))
+    if (data != null) {
+      data.arr.foreach(t => {
+        bw.write(s"$t\n")
+      })
+    }
+
+    bw.close()
+
+    val lastId = data.arr.lastOption match {
+      case Some(last) => last("id_str").str
+      case None       => ""
+    }
+
+    return lastId
+  }
   val signature = OAuthSignature(config, request)
   val authorizationHeader = signature.getSignedAuthorizationHeader
 
@@ -74,6 +82,8 @@ def go(handle: String, maxId: String): Unit = {
   // 3. get search response
   try {
 
+    print(request)
+
     val response: requests.Response = requests.get(
       s"${request.http_url}${queryString(request)}",
       headers = Map(
@@ -84,13 +94,9 @@ def go(handle: String, maxId: String): Unit = {
     )
 
     // 4. parse json
+    val handleFile = new File(s"data/$handle")
     val data = ujson.read(response.text)
-    printer(data)
-
-    val lastId = data.arr.lastOption match {
-      case Some(last) => last("id_str").str
-      case None       => ""
-    }
+    val lastId = printer(handleFile, data)
 
     go(handle, lastId)
 
