@@ -26,7 +26,7 @@ This commands writes the output to a file with the hashtag as file name.
 **To get all tweets by a user.**
 
 ```
-$ amm ByUser.sc "@jack" -1
+$ amm ByUser.sc "@jack" 0
 
 arguments:
 <twitter_username> required -- the hashtag / search term
